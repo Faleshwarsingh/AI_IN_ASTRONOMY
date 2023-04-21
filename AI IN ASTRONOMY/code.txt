@@ -1,0 +1,30 @@
+from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
+from astropy.table import Table
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from photutils import DAOStarFinder
+
+# Read in the FITS image file
+hdu_list = fits.open('image.fits')
+image_data = hdu_list[0].data
+
+# Calculate the image statistics and subtract the background
+mean, median, std = sigma_clipped_stats(image_data, sigma=3.0)
+image_data -= median
+
+# Find stars using the DAOStarFinder algorithm
+star_finder = DAOStarFinder(fwhm=5.0, threshold=5.0*std)
+star_table = star_finder(image_data)
+
+# Convert the star positions to sky coordinates
+coords = SkyCoord(star_table['xcentroid'], star_table['ycentroid'], frame='image', unit='pixel')
+coords = coords.to_frame('icrs')
+
+# Add some additional information to the table
+star_table['ra'] = coords['icrs'].ra.degree
+star_table['dec'] = coords['icrs'].dec.degree
+star_table['flux'] = star_table['peak'] - star_table['sky']
+
+# Print out the table of identified stars
+print(star_table)
